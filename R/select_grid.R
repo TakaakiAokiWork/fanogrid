@@ -1,50 +1,55 @@
 #' Select a grid size by minimising the MISE cost
 #'
-#' Scans square grids and returns the one that minimises
-#' \deqn{C(\Delta) = \frac{2 F \bar{k} - v}{(\Delta_x \Delta_y)^2},}
-#' the cost that remains once the grid-independent part of the mean integrated
-#' squared error is dropped. Here \eqn{\bar{k}} and \eqn{v} are the mean and the
-#' variance of the counts over the cells and \eqn{F} is the Fano factor. Setting
-#' `fano = 1` assumes the points fall independently and reproduces the
-#' Poisson-based selector of Shimazaki and Shinomoto (2007) in two dimensions;
-#' a larger `fano` inflates the sampling-error term and so selects a coarser
-#' grid.
+#' Scans square grids and returns the one that minimises the mean integrated squared error, with the sampling-error term scaled by the Fano factor.
+#' A warning is issued when the chosen grid sits at either end of the scan range.
 #'
-#' The scan runs over `n_grid` division counts spaced evenly on a log scale
-#' between `n_min` and `n_max`, with the same count on both axes.
-#'
-#' @param points A data frame with numeric columns `X` and `Y`, in the units of
-#'   `window`.
-#' @param window Numeric vector `c(xmin, xmax, ymin, ymax)` giving the
-#'   rectangular observation window.
-#' @param fano Fano factor held fixed during the scan. The default of 1 gives
-#'   the Poisson selector.
+#' @param points A data frame with numeric columns `X` and `Y`, in the units of `window`, all inside it.
+#' @param window Numeric vector `c(xmin, xmax, ymin, ymax)` giving the rectangular observation window.
+#' @param fano Fano factor held fixed during the scan.
 #' @param n_min,n_max Smallest and largest number of divisions per axis.
-#' @param n_grid Number of division counts to try between `n_min` and `n_max`.
+#' @param n_grid Number of division counts to try, spaced evenly on a log scale.
 #'
-#' @return A list with components `nx` and `ny`, the selected number of
-#'   divisions per axis, and `delta`, the cell side
-#'   \eqn{\sqrt{W_x W_y / (n_x n_y)}}.
-#'
-#' @references
-#' Shimazaki, H. and Shinomoto, S. (2007)
-#' A method for selecting the bin size of a time histogram.
-#' \emph{Neural Computation} \strong{19}(6), 1503-1527.
-#' \doi{10.1162/neco.2007.19.6.1503}
-#'
-#' Omi, T. and Shinomoto, S. (2011)
-#' Optimizing time histograms for non-Poissonian spike trains.
-#' \emph{Neural Computation} \strong{23}(12), 3125-3144.
-#' \doi{10.1162/NECO_a_00213}
+#' @return A list with the number of divisions per axis, `nx` and `ny`, and the cell side `delta`.
 #'
 #' @examples
-#' \dontrun{
-#' select_grid(synthetic_gps, target_area)
-#' select_grid(synthetic_gps, target_area, fano = 1.5)
-#' }
+#' gps <- read.csv(system.file("extdata", "synthetic_gps.csv.xz",
+#'                             package = "fanogrid"))
+#' window <- c(xmin = -21403, xmax = -11488, ymin = -34895, ymax = -24936)
+#'
+#' select_grid(gps, window)
+#' select_grid(gps, window, fano = 2)
 #'
 #' @export
 select_grid <- function(points, window, fano = 1,
                         n_min = 8L, n_max = 400L, n_grid = 120L) {
-  stop("not implemented")
+  check_inputs(points, window)
+  stopifnot(length(fano) == 1, is.finite(fano),
+            n_min >= 1, n_max >= n_min, n_grid >= 1)
+
+  width_x <- window[["xmax"]] - window[["xmin"]]
+  width_y <- window[["ymax"]] - window[["ymin"]]
+  n_points <- nrow(points)
+
+  # Candidate divisions per axis, spaced evenly on a log scale so that each one is about the same fraction finer than the last.
+  # Rounding to whole divisions leaves duplicates at the coarse end, which unique() drops.
+  division_counts <- unique(round(
+    exp(seq(log(n_min), log(n_max), length.out = n_grid))
+  ))
+
+  costs <- vapply(division_counts, function(n) {
+    counts <- tabulate(cell_index(points, window, n, n), nbins = n * n)
+    mean_count <- n_points / (n * n)
+    var_count <- (sum(counts^2) - n_points^2 / (n * n)) / (n * n)
+    cell_area <- (width_x / n) * (width_y / n)
+    (2 * fano * mean_count - var_count) / cell_area^2
+  }, numeric(1))
+
+  best_n <- division_counts[which.min(costs)]
+  if (best_n == division_counts[1] ||
+      best_n == division_counts[length(division_counts)]) {
+    warning("the selected grid sits at the edge of the scan range; ",
+            "widen n_min or n_max")
+  }
+  list(nx = best_n, ny = best_n,
+       delta = sqrt(width_x * width_y / (best_n * best_n)))
 }

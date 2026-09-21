@@ -11,7 +11,6 @@ fanogrid(
   tol = 0.01,
   r = 20,
   eta = 0.25,
-  nr = 200L,
   correction = "isotropic",
   n_min = 8L,
   n_max = 400L,
@@ -19,55 +18,34 @@ fanogrid(
 )
 }
 \arguments{
-\item{points}{A data frame with numeric columns \code{X} and \code{Y}, in the units of
-\code{window}.}
+\item{points}{A data frame with numeric columns \code{X} and \code{Y}, in the units of \code{window}, all inside it.}
 
-\item{window}{Numeric vector \code{c(xmin, xmax, ymin, ymax)} giving the
-rectangular observation window.}
+\item{window}{Numeric vector \code{c(xmin, xmax, ymin, ymax)} giving the rectangular observation window.}
 
 \item{max_iter}{Largest number of rounds to run.}
 
-\item{tol}{Relative change in the grid size below which the loop stops.}
+\item{tol}{Relative change in the grid size below which the loop stops.
+Set it to 0 to run all \code{max_iter} rounds.}
 
-\item{r, eta, nr, correction}{Passed to \code{\link[=estimate_fano]{estimate_fano()}}.}
+\item{r, eta, correction}{Passed to \code{\link[=estimate_fano]{estimate_fano()}}.}
 
 \item{n_min, n_max, n_grid}{Passed to \code{\link[=select_grid]{select_grid()}}.}
 }
 \value{
-A list with the selected cell side \code{delta}, the Fano factor \code{fano} it
-was selected under, the number of rounds \code{n_iter}, and \code{trace}, a data
-frame with one row per round holding \code{iter}, \code{nx}, \code{ny}, \code{delta} and
-\code{fano}.
+A list with the selected cell side \code{delta}, the Fano factor \code{fano} measured on that grid, the number of rounds \code{n_iter}, and \code{trace}, a data frame with one row per round.
 }
 \description{
-Estimates the grid size and the Fano factor together. Neither can be read off
-the data on its own: the cost function of \code{\link[=select_grid]{select_grid()}} needs a Fano
-factor, and \code{\link[=estimate_fano]{estimate_fano()}} needs a grid on which to hold the intensity
-constant. The two are therefore updated in turn, starting from the Poisson
-solution \eqn{F = 1}:
-}
-\details{
-\enumerate{
-\item \eqn{\Delta_0} is the grid chosen by \code{\link[=select_grid]{select_grid()}} at \eqn{F = 1}.
-\item \eqn{F_n} is the Fano factor estimated by \code{\link[=estimate_fano]{estimate_fano()}} on the grid
-\eqn{\Delta_n}.
-\item \eqn{\Delta_{n+1}} is the grid chosen by \code{\link[=select_grid]{select_grid()}} at \eqn{F_n}.
-}
-
-Steps 2 and 3 repeat until the grid changes by less than \code{tol} in relative
-terms, or until \code{max_iter} rounds have run. On the synthetic data of the
-reference below the loop settles within a few rounds.
+Estimates the grid size and the Fano factor together, since each estimator takes the other's output as its input.
+Starting from the Poisson solution, \code{\link[=select_grid]{select_grid()}} and \code{\link[=estimate_fano]{estimate_fano()}} are applied in turn until the grid changes by less than \code{tol}, or until \code{max_iter} rounds have run.
+A warning is issued when the grid is still moving after the last round.
 }
 \examples{
-\dontrun{
-fit <- fanogrid(synthetic_gps, target_area)
+gps <- read.csv(system.file("extdata", "synthetic_gps.csv.xz",
+                            package = "fanogrid"))
+window <- c(xmin = -21403, xmax = -11488, ymin = -34895, ymax = -24936)
+
+fit <- fanogrid(gps, window)
 fit$delta
 fit$trace
-}
 
-}
-\references{
-Aoki, T., Koyama, S. and Fujiwara, N.
-How fine a grid do GPS data support for urban populations when people move
-together?
 }

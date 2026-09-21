@@ -8,72 +8,135 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+                      fig.width = 6.5, fig.height = 4, dpi = 110)
 ```
-
-The functions shown here are not implemented yet, so the code chunks in this
-vignette are set to `eval = FALSE`.
 
 ```{r}
 library(fanogrid)
+library(ggplot2)
 ```
 
 ## The problem
 
-Aggregating GPS points onto a grid fixes the spatial resolution of everything
-computed downstream, so the grid size has to be chosen rather than assumed.
-Selectors that minimise the mean integrated squared error do this by trading
-sampling noise in a cell against variation of the density within it, and they
-assume the points fall independently. GPS points do not: people travel with
-family, friends and colleagues, which leaves groups of points a few metres
-apart. A selector that assumes independence reads that lumpiness as structure in
-the underlying density and asks for a finer grid than the data support.
+Choosing a bin width for a histogram, or a bandwidth for a kernel density estimate, is a routine step with well-developed answers.
+Aggregating GPS points onto a grid is the two-dimensional histogram case of the same problem, and the grid size fixes the spatial resolution of everything computed downstream.
 
-The Fano factor measures how much of the variance in the cell counts exceeds the
-Poisson level. Feeding it back into the cost function removes the part of the
-variance that comes from people moving together.
+These selectors are derived for points that are located independently of one another.
+However, GPS points are not independent: people move together, so a single group leaves many points within a few metres.
+A selector that assumes independence reads that lumpiness as genuine detail in the density field and asks for a finer grid than the data support.
+
+The Fano factor measures how much of the variance in the cell counts exceeds the Poisson level.
+Feeding it back into the cost function removes the part of the variance that comes from people moving together.
 
 ## The data
 
-`synthetic_gps` is one realisation of a clustered pattern whose underlying
-density is piecewise constant on the 250-meter census grid, so the scale to
-recover is known. `target_area` is the window it was generated over.
+The package ships one synthetic sample whose true grid size is known by construction: the density it was generated from is constant within each cell of the 250 m grid of the 2015 Japanese population census.
+Those cells are rectangles of about 283 m by 231 m, so the finest scale the density varies on is the shorter side, and that is what a selector should land near.
+The clustering was tuned to a Fano factor of 2.0, so that quantity has a known target too.
+See Aoki, Koyama and Fujiwara (arXiv:xxxx.xxxxx) for details of the generator.
+Coordinates are in metres in the Japan Plane Rectangular CS IX projection (EPSG:6677), over an area of about 10 km by 10 km in Tokyo.
 
 ```{r}
-str(synthetic_gps)
-target_area
+gps <- read.csv(system.file("extdata", "synthetic_gps.csv.xz",
+                            package = "fanogrid"))
+window <- c(xmin = -21403, xmax = -11488, ymin = -34895, ymax = -24936)
+
+str(gps)
+
+# the shorter side of the census cell
+true_scale <- 231
+```
+
+Every function in this package takes the window as these four numbers, and every point has to lie inside it.
+
+```{r fig-data, fig.height = 5.2, fig.cap = "Figure 1. The density the sample was generated from, with a random tenth of the points drawn on top. The density is constant within each census cell, so the scale it varies on is the cell size."}
+intensity <- read.csv(system.file("extdata", "census_intensity.csv.gz",
+                                  package = "fanogrid"))
+set.seed(1)
+shown <- gps[sample(nrow(gps), 10000), ]
+
+ggplot() +
+  geom_polygon(data = intensity, aes(x, y, group = cell, fill = intensity),
+               colour = NA) +
+  geom_point(data = shown, aes(X, Y), size = 0.08, alpha = 0.35,
+             colour = "grey15") +
+  scale_fill_viridis_c(name = expression("points / km"^2), trans = "sqrt") +
+  coord_fixed(expand = FALSE) +
+  labs(x = "Easting (m)", y = "Northing (m)") +
+  theme_bw()
 ```
 
 ## What a Poisson selector chooses
 
-`select_grid()` with `fano = 1` is the two-dimensional form of the
-Shimazaki-Shinomoto selector.
+Setting `fano = 1` reduces `select_grid()` to one of the existing selectors, the two-dimensional form of the unbiased risk estimator of Shimazaki and Shinomoto (2007), which assumes the points are independent.
 
 ```{r}
-select_grid(synthetic_gps, target_area, fano = 1)
+poisson_grid <- select_grid(gps, window, fano = 1)
+poisson_grid
 ```
+
+It asks for cells of about `r sprintf("%.0f", poisson_grid$delta)` m, roughly a third of the `r true_scale` m the density varies on.
 
 ## Estimating the Fano factor
 
-`estimate_fano()` needs a grid, because it holds the intensity constant within
-each cell.
+`estimate_fano()` needs a grid, because it holds the intensity constant within each cell and drops the cells where the intensity is lowest.
+On the grid the Poisson selector just chose:
 
 ```{r}
-estimate_fano(synthetic_gps, target_area, nx = 40, ny = 40)
+estimate_fano(gps, window, nx = poisson_grid$nx, ny = poisson_grid$ny)
 ```
+
+The counts vary about twice as much as a Poisson process would give, close to the 2.0 the sample was generated with.
 
 ## Estimating both together
 
-`fanogrid()` alternates the two steps until the grid stops moving.
+Each estimator takes the other's output as its input, so `fanogrid()` updates them in turn until the grid stops moving.
+With the default `tol` the loop stops as soon as the grid stops changing, which here is after the second round.
+Setting `tol = 0` switches that off and runs all `max_iter` rounds, which shows the loop settling rather than merely being cut off.
 
 ```{r}
-fit <- fanogrid(synthetic_gps, target_area)
+fit <- fanogrid(gps, window, max_iter = 5, tol = 0)
 fit$delta
 fit$fano
 fit$trace
 ```
 
+```{r fig-trace, fig.height = 3.4, fig.cap = "Figure 2. Grid size over five rounds, with the early stop switched off. It settles after the first round and stays there. The red line marks the shorter side of the census cell the density varies on, the blue one the grid that assuming independence gives."}
+references <- data.frame(
+  value = c(true_scale, poisson_grid$delta),
+  reference = factor(c("generating value", "fano = 1 result"),
+                     levels = c("generating value", "fano = 1 result"))
+)
+
+ggplot(fit$trace, aes(iter, delta)) +
+  geom_hline(data = references,
+             aes(yintercept = value, colour = reference, linetype = reference)) +
+  geom_line() +
+  geom_point() +
+  scale_colour_manual(values = c("#c0392b", "#2c7fb8"), name = NULL) +
+  scale_linetype_manual(values = c("dashed", "dotted"), name = NULL) +
+  scale_x_continuous(breaks = fit$trace$iter) +
+  scale_y_continuous(expand = expansion(mult = 0.12)) +
+  labs(x = "Round", y = "Grid size (m)") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
 ## Reading the result
 
-The Poisson selector and `fanogrid()` are compared against the 250-meter scale
-built into the data. This section is written once the estimators return numbers.
+The Poisson selector chose cells of `r sprintf("%.0f", poisson_grid$delta)` m and `fanogrid()` chose `r sprintf("%.1f", fit$delta)` m, against the `r true_scale` m the density varies on.
+Assuming independence therefore costs a factor of `r sprintf("%.1f", fit$delta / poisson_grid$delta)` in cell side, and its square in cell area.
+The extra variance that comes from people moving in groups is read as structure in the density, and the selector refines the grid to chase it.
+Correcting the cost function by the estimated Fano factor removes that part of the variance, and what is left lands on the scan candidate closest to the shorter side of the census cell.
+
+## References
+
+Aoki, T., Koyama, S. and Fujiwara, N.
+How fine a grid do GPS data support for urban populations when people move together?
+arXiv:xxxx.xxxxx
+
+Shimazaki, H. and Shinomoto, S. (2007)
+A method for selecting the bin size of a time histogram.
+*Neural Computation* **19**(6), 1503-1527.
+<https://doi.org/10.1162/neco.2007.19.6.1503>

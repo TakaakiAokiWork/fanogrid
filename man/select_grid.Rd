@@ -7,54 +7,29 @@
 select_grid(points, window, fano = 1, n_min = 8L, n_max = 400L, n_grid = 120L)
 }
 \arguments{
-\item{points}{A data frame with numeric columns \code{X} and \code{Y}, in the units of
-\code{window}.}
+\item{points}{A data frame with numeric columns \code{X} and \code{Y}, in the units of \code{window}, all inside it.}
 
-\item{window}{Numeric vector \code{c(xmin, xmax, ymin, ymax)} giving the
-rectangular observation window.}
+\item{window}{Numeric vector \code{c(xmin, xmax, ymin, ymax)} giving the rectangular observation window.}
 
-\item{fano}{Fano factor held fixed during the scan. The default of 1 gives
-the Poisson selector.}
+\item{fano}{Fano factor held fixed during the scan.}
 
 \item{n_min, n_max}{Smallest and largest number of divisions per axis.}
 
-\item{n_grid}{Number of division counts to try between \code{n_min} and \code{n_max}.}
+\item{n_grid}{Number of division counts to try, spaced evenly on a log scale.}
 }
 \value{
-A list with components \code{nx} and \code{ny}, the selected number of
-divisions per axis, and \code{delta}, the cell side
-\eqn{\sqrt{W_x W_y / (n_x n_y)}}.
+A list with the number of divisions per axis, \code{nx} and \code{ny}, and the cell side \code{delta}.
 }
 \description{
-Scans square grids and returns the one that minimises
-\deqn{C(\Delta) = \frac{2 F \bar{k} - v}{(\Delta_x \Delta_y)^2},}
-the cost that remains once the grid-independent part of the mean integrated
-squared error is dropped. Here \eqn{\bar{k}} and \eqn{v} are the mean and the
-variance of the counts over the cells and \eqn{F} is the Fano factor. Setting
-\code{fano = 1} assumes the points fall independently and reproduces the
-Poisson-based selector of Shimazaki and Shinomoto (2007) in two dimensions;
-a larger \code{fano} inflates the sampling-error term and so selects a coarser
-grid.
-}
-\details{
-The scan runs over \code{n_grid} division counts spaced evenly on a log scale
-between \code{n_min} and \code{n_max}, with the same count on both axes.
+Scans square grids and returns the one that minimises the mean integrated squared error, with the sampling-error term scaled by the Fano factor.
+A warning is issued when the chosen grid sits at either end of the scan range.
 }
 \examples{
-\dontrun{
-select_grid(synthetic_gps, target_area)
-select_grid(synthetic_gps, target_area, fano = 1.5)
-}
+gps <- read.csv(system.file("extdata", "synthetic_gps.csv.xz",
+                            package = "fanogrid"))
+window <- c(xmin = -21403, xmax = -11488, ymin = -34895, ymax = -24936)
 
-}
-\references{
-Shimazaki, H. and Shinomoto, S. (2007)
-A method for selecting the bin size of a time histogram.
-\emph{Neural Computation} \strong{19}(6), 1503-1527.
-\doi{10.1162/neco.2007.19.6.1503}
+select_grid(gps, window)
+select_grid(gps, window, fano = 2)
 
-Omi, T. and Shinomoto, S. (2011)
-Optimizing time histograms for non-Poissonian spike trains.
-\emph{Neural Computation} \strong{23}(12), 3125-3144.
-\doi{10.1162/NECO_a_00213}
 }

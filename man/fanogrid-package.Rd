@@ -5,7 +5,7 @@
 \alias{fanogrid-package}
 \title{fanogrid: Grid-Size Selection for Clustered Spatial Point Data}
 \description{
-Chooses a grid size for aggregating spatial point data whose points are clustered. Selectors that minimise the mean integrated squared error assume the points fall independently, so clustering that comes from people moving together is read as fine-scale structure in the underlying density and the selected grid is finer than the data support. The Fano factor, estimated from the inhomogeneous K-function, measures how much of the variance in the cell counts exceeds the Poisson level, and it enters the cost function as a correction. Grid size and Fano factor are estimated together by alternating updates until the grid stops changing.
+Chooses a grid size for aggregating spatial point data whose points are clustered. Selectors that minimise the mean integrated squared error assume the points fall independently. Clustering that comes from people moving together is then read as fine-scale structure in the underlying density, and the selected grid is finer than the data support. The Fano factor, estimated from the inhomogeneous K-function, measures how much of the variance in the cell counts exceeds the Poisson level, and it enters the cost function as a correction. Grid size and Fano factor are estimated together by alternating updates until the grid stops changing.
 }
 \seealso{
 Useful links:

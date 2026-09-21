@@ -6,15 +6,18 @@ Authors@R: c(
            role = c("aut", "cre")),
     person("Shinsuke", "Koyama", role = "aut"),
     person("Naoya", "Fujiwara", role = "aut"))
-Description: Chooses a grid size for aggregating spatial point data whose points
-    are clustered. Selectors that minimise the mean integrated squared error
-    assume the points fall independently, so clustering that comes from people
-    moving together is read as fine-scale structure in the underlying density and
-    the selected grid is finer than the data support. The Fano factor, estimated
-    from the inhomogeneous K-function, measures how much of the variance in the
-    cell counts exceeds the Poisson level, and it enters the cost function as a
-    correction. Grid size and Fano factor are estimated together by alternating
-    updates until the grid stops changing.
+Description: Chooses a grid size for aggregating spatial point data whose
+    points are clustered.
+    Selectors that minimise the mean integrated squared error assume the points
+    fall independently.
+    Clustering that comes from people moving together is then read as fine-scale
+    structure in the underlying density, and the selected grid is finer than the
+    data support.
+    The Fano factor, estimated from the inhomogeneous K-function, measures how
+    much of the variance in the cell counts exceeds the Poisson level, and it
+    enters the cost function as a correction.
+    Grid size and Fano factor are estimated together by alternating updates
+    until the grid stops changing.
 License: GPL (>= 3)
 Encoding: UTF-8
 Depends: R (>= 4.1)
@@ -24,12 +27,12 @@ Imports:
     spatstat.geom,
     stats
 Suggests:
+    ggplot2,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
-LazyData: true
 Roxygen: list(markdown = TRUE)
 URL: https://github.com/TakaakiAokiWork/fanogrid
 BugReports: https://github.com/TakaakiAokiWork/fanogrid/issues

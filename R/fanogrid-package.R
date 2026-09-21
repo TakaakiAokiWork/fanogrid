@@ -1,10 +1,5 @@
 #' @keywords internal
 "_PACKAGE"
 
-## usethis namespace: start
-#' @importFrom spatstat.geom ppp owin as.owin area
-#' @importFrom spatstat.explore Kinhom
-#' @importFrom sf st_polygon st_sfc st_union
-#' @importFrom stats quantile
-## usethis namespace: end
+# Every call into another package is written pkg::fun(), so there is nothing to import into the namespace.
 NULL
