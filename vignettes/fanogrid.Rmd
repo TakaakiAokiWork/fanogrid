@@ -1,0 +1,79 @@
+---
+title: "Choosing a grid size for clustered GPS points"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Choosing a grid size for clustered GPS points}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+The functions shown here are not implemented yet, so the code chunks in this
+vignette are set to `eval = FALSE`.
+
+```{r}
+library(fanogrid)
+```
+
+## The problem
+
+Aggregating GPS points onto a grid fixes the spatial resolution of everything
+computed downstream, so the grid size has to be chosen rather than assumed.
+Selectors that minimise the mean integrated squared error do this by trading
+sampling noise in a cell against variation of the density within it, and they
+assume the points fall independently. GPS points do not: people travel with
+family, friends and colleagues, which leaves groups of points a few metres
+apart. A selector that assumes independence reads that lumpiness as structure in
+the underlying density and asks for a finer grid than the data support.
+
+The Fano factor measures how much of the variance in the cell counts exceeds the
+Poisson level. Feeding it back into the cost function removes the part of the
+variance that comes from people moving together.
+
+## The data
+
+`synthetic_gps` is one realisation of a clustered pattern whose underlying
+density is piecewise constant on the 250-meter census grid, so the scale to
+recover is known. `target_area` is the window it was generated over.
+
+```{r}
+str(synthetic_gps)
+target_area
+```
+
+## What a Poisson selector chooses
+
+`select_grid()` with `fano = 1` is the two-dimensional form of the
+Shimazaki-Shinomoto selector.
+
+```{r}
+select_grid(synthetic_gps, target_area, fano = 1)
+```
+
+## Estimating the Fano factor
+
+`estimate_fano()` needs a grid, because it holds the intensity constant within
+each cell.
+
+```{r}
+estimate_fano(synthetic_gps, target_area, nx = 40, ny = 40)
+```
+
+## Estimating both together
+
+`fanogrid()` alternates the two steps until the grid stops moving.
+
+```{r}
+fit <- fanogrid(synthetic_gps, target_area)
+fit$delta
+fit$fano
+fit$trace
+```
+
+## Reading the result
+
+The Poisson selector and `fanogrid()` are compared against the 250-meter scale
+built into the data. This section is written once the estimators return numbers.
